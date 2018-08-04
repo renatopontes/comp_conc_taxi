@@ -1,0 +1,465 @@
+\documentclass[a4paper,landscape,12pt]{article}
+
+\usepackage{kpfonts}
+\usepackage{inconsolata}
+\usepackage{listings}
+\usepackage{color}
+
+\usepackage[brazilian]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage[tocflat]{tocstyle}
+\usetocstyle{standard}
+
+\usepackage{natbib}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\graphicspath{{images/}}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{vmargin}
+\setmarginsrb{3 cm}{2.5 cm}{3 cm}{2.5 cm}{1 cm}{1.5 cm}{1 cm}{1.5 cm}
+
+\title{Sistema Táxi-Passageiro}			                    % Title
+\author{Renato Pontes Rodrigues\\Ygor Luís M. P. da Hora}	% Author
+\date{7 de Julho de 2015}									% Date
+
+\makeatletter
+\let\thetitle\@title
+\let\theauthor\@author
+\let\thedate\@date
+\makeatother
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\theauthor}
+\lhead{\thetitle}
+\cfoot{\thepage}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,allcolors=blue}
+\usepackage{hypcap}
+\begin{document}
+\lstset{language=C++,basicstyle=\footnotesize\ttfamily,breaklines=true, tabsize=4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{titlepage}
+	\centering
+    \vspace*{0.5 cm}
+    \includegraphics[scale = 0.50]{minerva.jpg}\\[1.0 cm]	% University Logo
+    \textsc{\LARGE Universidade Federal do Rio de Janeiro}\\[2.0 cm]
+                                                        % University Name
+	\textsc{\Large MAB117}\\[0.5 cm]				    % Course Code
+	\textsc{\large Computação Concorrente}\\[0.5 cm]	% Course Name
+	\rule{\linewidth}{0.2 mm} \\[0.4 cm]
+	{ \huge \bfseries \thetitle}\\
+	\rule{\linewidth}{0.2 mm} \\[1.5 cm]
+	
+	\begin{minipage}{0.4\textwidth}
+		\begin{flushleft} \large
+			\emph{Aluno:}\\
+			\theauthor
+			\end{flushleft}
+			\end{minipage}~
+			\begin{minipage}{0.4\textwidth}
+			\begin{flushright} \large
+			\emph{DRE:} \\
+			113131049\\113043644						% Your Student Number
+		\end{flushright}
+	\end{minipage}\\[2 cm]
+	
+	{\large \thedate}\\[2 cm]
+ 
+	\vfill
+	
+\end{titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tableofcontents
+\pagebreak
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Documentação da solução}
+
+\subsection*{Introdução}
+A aplicação foi desenvolvida utilizando-se a linguagem \textbf{Java}. Por ser um programa concorrente, não somos capazes de descrever o fluxo de execução de forma linear.
+
+O que fazemos a seguir é descrever cada classe \texttt{*.java} que criamos e o papel de suas instâncias durante a execução da aplicação.
+
+
+\begin{lstlisting}
+#include <bits/stdc++.h>
+
+using namespace std;
+
+class Package {
+public:
+	int qt;
+	int wt;
+
+	Package(int qt, int wt): qt(qt), wt(wt) {}
+};
+
+class State {
+public:
+	int qt;
+	bitset<128> ch;
+
+	State(): qt(0), ch(0) {}
+	State(int qt, string ch): qt(qt), ch(ch) {}
+};
+
+State maxtoys(int cap, int pac, vector<Package>& p) {
+	vector<vector<State> > mt(cap+1, vector<State>(pac+1));
+	// int wt = 0;
+
+	for (int i = 0; i <= cap; ++i) {
+		for (int j = 0; j <= pac; ++j) {
+			if (i == 0 or j == 0) {
+				mt[i][j] = State();
+			}
+			else if (p[j-1].wt <= i) {
+				if (mt[i][j-1].qt < p[j-1].qt + mt[i-p[j-1].wt][j-1].qt) {
+					mt[i][j] = State(p[j-1].qt + mt[i-p[j-1].wt][j-1].qt, mt[i-p[j-1].wt][j-1].ch.to_string());
+					mt[i][j].ch.set(j-1);
+				}
+				else {
+					mt[i][j] = mt[i][j-1];
+				}
+
+			}
+			else {
+				mt[i][j] = mt[i][j-1];
+			}
+		}
+	}
+
+	return mt[cap][pac];
+}
+
+int main() {
+	int tc, pac, qt, wt;
+
+	cin >> tc;
+	while(tc--) {
+		cin >> pac;
+		vector<Package> P;
+
+		for (int i = 0; i < pac; ++i) {
+			cin >> qt >> wt;
+			P.push_back(Package(qt, wt));
+		}
+
+		State sol = maxtoys(50, pac, P);
+
+		int weight = 0;
+		int rem = 0;
+		for (int i = 0; i < pac; ++i) {
+			if (sol.ch.test(i)) {
+				weight += P[i].wt;
+			} else {
+				rem++;
+			}
+		}
+
+		cout << sol.qt << " brinquedos\nPeso: " << weight << " kg\nsobra(m) " << rem << " pacote(s)\n\n";
+	}
+}
+\end{lstlisting}
+
+\subsection{Main}
+O objetivo da classe \texttt{Main} é fornecer a via de entrada para o início da execução do programa, permitindo a leitura dos dados para a simulação da aplicação distribuída e início do processamento. Esta classe garante ainda que ao fim da simulação seja exibido um relatório com a posição final dos taxistas e os tempos de execução de cada parte da aplicação, na forma descrita na seção \textit{Saída do programa}. O único método desta classe é \textbf{\texttt{public static void main(String[] args)}}, que inicia a aplicação e é descrito a seguir:
+
+Uma instância da classe \texttt{Scanner} permite a leitura dos dados de entrada especificados na descrição do trabalho a partir do dispositivo de entrada padrão. A matriz que representa o mapa da cidade é implícita, e por isso as dimensões N e M fornecidas na entrada são ignoradas. Em seguida, uma vez que o número de clientes é especificado, é criada uma instância para a classe \texttt{Central} com o papel de intermediar a comunicação entre clientes e taxistas\textemdash que como veremos, terão cada um sua própria linha de execução. Cada cliente e suas especificações ficam associados a uma instância da classe \texttt{Client}, com capacidade de tornar-se uma thread. O mesmo encapsulamento serve para os taxistas que por sua vez estarão associados a uma instância da classe \texttt{Taxi}. Conforme taxistas e clientes são instanciados, ambos são incluídos como elemento de uma lista de threads.
+
+Após todos os dados de entrada serem obtidos é efetivado o lançamento das instâncias das classes \texttt{Client} e \texttt{Taxi} vistas na lista de threads formada. Observe ainda que utilizamos um método estático da classe \texttt{java.util.Collections} chamado \texttt{reverse()} com o objetivo de inverter a ordenação da lista, de modo a fazer com que as threads taxistas tenham uma chance maior de serem iniciadas antes das threads clientes. Este cenário nos pareceu mais interessante porque isto também significa que o primeiro cliente tem mais chances de escolher entre vários táxis, ao invés de ser associado a um dos primeiros táxis a ficarem disponíveis.
+
+\subsection{Coord}
+Antes de efetivamente entendermos o funcionamento das demais classes do trabalho, e que tem papel estrutural fundamental na realização do mesmo, entenderemos o funcionamento de uma classe com papel organizacional chamada \texttt{Coord}. A classe \texttt{Coord} tem o objetivo de modularizar os pontos em coordenadas cartesianas a que cada instância de \texttt{Client} e \texttt{Taxi} estará associada. Seja este ponto de origem ou de destino, todos serão vistos como instâncias da classe \texttt{Coord}. 
+Além desta funcionalidade, a classe encapsula alguns métodos úteis relativos ao contexto cartesiano.
+
+\subsubsection{Atributos}
+
+\textbf{\texttt{x}, \texttt{y}} \\
+Coordenadas x e y do ponto $(x,y)$ representado pelo objeto.
+
+\subsubsection{Métodos}
+\textbf{\texttt{public void set(Coord dest)}} \\
+Dada uma instância da classe \texttt{Coord} é possível mudar seus atributos, ou seja, suas coordenadas cartesianas mesmo após a sua construção, copiando os atributos de uma outra instância da classe \texttt{Coord}.
+
+\textbf{\texttt{public int distanceTo(Coord c2)}} \\
+A partir de toda instância de \texttt{Coord} é possível encontrar sua distância de Manhattan até outro ponto coordenado também representado por uma instância de \texttt{Coord}. Este método retorna exatamente esta distância. O cálculo desta distância nada mais é que o valor absoluto da diferença entre abcissas de dois pontos somado ao valor absoluto da diferença entre ordenadas de dois pontos.
+
+\textbf{\texttt{public String toString()}} \\
+O objetivo deste método é definir uma \texttt{String} representante da classe que deverá ser retornada quando uma instância da classe precisa ser exibida pelo método de saída padrão.
+
+\textbf{\texttt{public int getX() \\
+public int getY()}} \\
+Os outros métodos desta classe são getters para acessar alguns atributos privados de cada objeto \texttt{Coord} a partir da instância de \texttt{Central}.
+
+\subsection{Client}
+A primeira classe que abordaremos com papel especialmente estrutural na implementação da simulação do sistema distribuído é a classe \texttt{Client}. No momento de sua construção na classe \texttt{Main} ela tem o papel de encapsular dados. A partir do seu lançamento e ganho de processamento, ou seja, execução do método \texttt{run()} da classe \texttt{Client}, esta representa um novo contexto de execução, tornando-se uma thread que concorre com outras lançadas.
+
+\subsubsection{Atributos}
+\textbf{\texttt{idcount}} \\
+Uma variável estática responsável por gerar identificadores distintos para cada objeto \texttt{Client}.
+
+\textbf{\texttt{id}} \\
+Uma variável inteira que guarda o identificador de cada objeto \texttt{Client}. \\
+$ 1 \leq id \leq P $
+
+\textbf{\texttt{origin}, \texttt{dest}} \\
+Dois objetos \texttt{Coord} que guardam as coordenadas de origem e destino associados a cada instância de um objeto \texttt{Client}.
+
+\textbf{\texttt{central}} \\
+Uma referência para a única instância de \texttt{Central} que existe na aplicação.
+
+\subsubsection{Métodos}
+\textbf{\texttt{public void run()}} \\
+Cada thread tem o único objetivo de simular a requisição de um cliente por um táxi ao núcleo do sistema distribuído.
+
+\textbf{\texttt{public int getId() \\
+public Coord getDest() \\
+public Coord getOrigin()}} \\
+Estes métodos auxiliares são getters e setters utilizados por instâncias de \texttt{Taxi} e \texttt{Central} para acessar atributos privados do objeto \texttt{Coord}.
+
+\subsection{Taxi}
+Um objeto \texttt{Taxi} encapsula as propriedades e funções dos taxistas. Esta classe implementa a interface \texttt{Runnable}, e por isso suas instâncias são capazes de executar o método \texttt{run()} concorrentemente.
+
+\subsubsection{Atributos}
+\textbf{\texttt{idcount}} \\
+Uma variável estática responsável por gerar identificadores distintos para cada objeto \texttt{Taxi}.
+
+\textbf{\texttt{id}} \\
+Uma variável inteira que guarda o identificador de cada objeto \texttt{Taxi}. \\
+$ 1 \leq id \leq T $
+
+\textbf{\texttt{coord}} \\
+Um objeto \texttt{Coord} que guarda as coordenadas atuais do objeto \texttt{Taxi}.
+
+\textbf{\texttt{central}} \\
+Uma referência para a única instância de \texttt{Central} que existe na aplicação.
+
+\textbf{\texttt{currentclient}} \\
+Um objeto \texttt{Client}. Se o valor desta variável é \texttt{null}, isto quer dizer que o táxi não tem cliente e está disponível para ser escolhido. Quando um objeto \texttt{current\-client} é criado, o valor desta variável é \texttt{null}.
+
+\subsubsection{Métodos}
+
+\textbf{\texttt{public void run()}} \\
+Descreve a lógica das threads que representam os táxis. Um táxi deve tentar atender clientes enquanto houver clientes sem táxis associados. Isto é feito com um laço infinito. A cada iteração, o taxi usa o método \texttt{central.getRequest()} para informar que está disponível e aguardar que seja escolhido para atender um cliente. Se após a execução deste método o campo \texttt{currentclient} for \texttt{null}, então todos os clientes foram atendidos e a thread pode interromper o loop, sair deste método e ser finalizada. Se um cliente foi designado para o táxi, ele realiza o atendimento ao cliente utilizando o método privado \texttt{travel()}, e em seguida tenta atender outro cliente.
+
+\textbf{\texttt{private void travel()}} \\
+Este método bloqueia a thread por certo tempo, para simular a viagem do táxi até o cliente e do cliente até o seu destino. O tempo de cada bloqueio é proporcional a distância de cada viagem.
+
+\textbf{\texttt{public int getId() \\
+public Coord getCoord() \\
+public Client getCurrentclient() \\
+public void setCurrentclient(Client currentclient)}} \\
+Estes métodos auxiliares são getters e setters para acessar/modificar alguns atributos privados de cada objeto \texttt{Taxi} a partir da instância de \texttt{Central}.
+
+\subsection{Central}
+A classe \texttt{Central} faz o papel de um \textbf{monitor}. Ela encapsula toda a lógica de sincronização das threads. Para garantir o comportamento adequado da aplicação, só deve existir uma instância desta classe conhecida pelos objetos \texttt{Taxi} e \texttt{Client} ao longo de toda a aplicação.
+
+\subsubsection{Atributos}
+\textbf{\texttt{nclient}} \\
+Guarda o total de clientes que ainda não tem um táxi associado, mesmo que eles não tenham feito um pedido. Este atributo é utilizado como critério de parada da aplicação. Ele é inicializado com o número de clientes dado pela entrada do algoritmo e decrementa até alcançar o valor zero.
+
+\textbf{\texttt{clientlog}} \\
+Variável que guarda quantos clientes estão em contato com a Central, mas ainda não foram associados a um táxi. Esta variável existe apenas para ser usada no log de execução.
+
+\textbf{\texttt{ltaxis}} \\
+Uma lista de objetos \texttt{Taxi}. Ela contém apenas táxis disponíveis.
+
+\textbf{\texttt{finalcoord}} \\
+Um vetor de objetos \texttt{Coord} que contém as posições finais de cada taxista. A posição $i$ do vetor guarda a posição final do taxista $i+1$. Este atributo existe apenas para não intercalar a saída do programa com o log de execução e também para imprimir as posições finais numa determinada ordem.
+
+\subsubsection{Métodos}
+
+\textbf{\texttt{public synchronized void getRequest(Taxi taxi)}} \\
+Este método é usado pelas instâncias de \texttt{Taxi}, para informar a \texttt{Central} que aquele táxi em particular está disponível para ser escolhido por um cliente. Quando um táxi informa isto, ele é colocado num objeto \texttt{ArrayList} administrado pela \texttt{Central}, que contém os táxis disponíveis. Se não existem clientes para serem atendidos, a \texttt{Central} simplesmente retira o táxi deste método, sem cliente. Se este é o primeiro táxi a ficar disponível, ele tenta notificar os clientes que poderiam ter pedido táxi enquanto nenhum estava disponível. Depois de ser colocado nesta lista, o táxi se bloqueia, aguardando ser escolhido para atender algum cliente.
+
+Se um cliente foi associado a este táxi, o táxi acorda e sai deste método, levando com ele uma referência para o cliente que deve ser atendido.
+Se todos os clientes foram atendidos, o táxi acorda e sai do método, sem cliente.
+A exclusão mútua é necessária nesse método, por exemplo, porque objetos \texttt{ArrayList} (onde os táxis disponíveis são enfileirados) não são thread-safe.
+
+\textbf{\texttt{public synchronized void makeRequest(Client client)}} \\
+Este método é chamado pelas instâncias de \texttt{Client}, quando o cliente quer pedir um táxi. A exclusão mútua é justificada pelo uso de variáveis usadas por outros métodos da \texttt{Central}, e também porque a \texttt{Central} não pode associar o mesmo táxi a mais de um cliente.
+
+O método inicialmente verifica se há táxis na lista de táxis disponíveis que a \texttt{Central} mantém. Se não existem táxis disponíveis, o cliente aguarda pela disponibilidade de táxis. Se há táxis disponíveis, a \texttt{Central} utiliza o método privado \texttt{chooseTaxi()} para determinar o táxi ótimo para este cliente dentre os táxis que estão disponíveis naquele momento. Depois de ter escolhido o táxi, uma referência para este cliente é dada ao táxi designado, e o táxi é retirado da lista de táxis disponíveis.
+Decrementamos o número de clientes que ainda precisam ser atendidos e usamos um \texttt{notifyAll()} para comunicar ao táxi escolhido de que ele já pode atender o cliente. O método então termina.
+
+\textbf{\texttt{private Taxi chooseTaxi(Client client)}} \\
+Este método escolhe e retorna, dentre a lista de táxis disponíveis, o táxi que está a menor distância do objeto \texttt{Client} passado como argumento, com auxílio do método \texttt{distanceTo()} da classe \texttt{Coord}.
+
+\textbf{\texttt{public void report(int id, Coord coord)}} \\
+Este método é utilizado pelas instâncias de \texttt{Taxi} para que estas informem a \texttt{Cen\-tral} suas posições quando não há mais clientes para serem atendidos. Cada táxi escreve suas coordenadas na posição $id-1$ da lista de coordenadas finais mantida pela \texttt{Central}. Como todos os táxis tem identificadores distintos, nenhum deles escreve na mesma posição e por isso este método não precisa de mecanismos de sincronização.
+
+\textbf{\texttt{public void printReport()}} \\
+Este método é chamado pelo método \texttt{Main.main()} para pedir que a instância de \texttt{Central} imprima a saída do programa depois que todas as threads terminam. Ele cria um objeto \texttt{StringBuilder} (otimizado para concatenações), e adiciona a esse objeto uma a uma as coordenadas finais dos taxistas, sempre obedecendo ao formato especificado na descrição do trabalho. Este método também garante que uma linha em branco exista entre o fim do log e o início da saída e outra entre o fim da saída e os tempos de execução.
+
+\newpage
+\section{Utilização da aplicação}
+
+\subsection{Compilação}
+\textbf{ATENÇÃO}: Para compilar é necessário ter o compilador \textbf{JAVAC $\geq$ 1.7.x} instalado. Versões mais antigas podem funcionar, mas não foram testadas. 
+
+\subsubsection*{Linux}
+Para compilar a aplicação no Linux, basta abrir o terminal na raiz do diretório \texttt{TaxiDriver} e utilizar o \texttt{makefile} incluso, digitando
+\begin{verbatim}
+$ make
+\end{verbatim}
+ou, para compilar manualmente,
+\begin{verbatim}
+$ mkdir -p bin
+$ javac -sourcepath src -cp bin -d bin -encoding utf8 src/Main.java
+\end{verbatim}
+Os arquivos \texttt{*.class} serão gerados no diretório \texttt{bin} (será criado se não existir).
+
+\subsubsection*{Windows}
+Alguns pacotes incluem um porte do \texttt{make} para Windows (\textit{Ruby DevKit}, \textit{MinGW}). Nessas condições, basta utilizar o \texttt{makefile} incluso de forma análoga ao processo no Linux.
+
+Para compilar a aplicação no Windows manualmente, basta abrir a linha de comando na raiz da pasta \texttt{TaxiDriver} e utilizar os seguintes comandos:
+\begin{verbatim}
+$ mkdir -p bin
+$ javac -sourcepath src -cp bin -d bin -encoding utf8 src/Main.java
+\end{verbatim}
+Os arquivos \texttt{*.class} serão gerados na pasta \texttt{bin} (será criada se não existir).
+
+\subsection{Gerador de casos de teste}
+Na pasta \texttt{tc} está incluído um script \texttt{gen\_tc.py} (deve ser executado com Py\-thon 3) que gera casos de teste para a aplicação.
+
+No Linux pode ser necessário dar permissão para o script ser executado:
+\begin{verbatim}
+$ chmod +x gen_tc.py
+\end{verbatim}
+É recomendável que o script esteja no HD e não em um disco removível. Para executá-lo basta estar na pasta \texttt{tc} e escrever:
+\begin{verbatim}
+$ ./gen_tc.py
+\end{verbatim}
+É necessário fornecer ao gerador os parâmetros N, M, P e T, conforme instruções exibidas na tela pelo programa. Note que estes parâmetros devem estar em conformidade com os limites estabelecidos na descrição do trabalho:
+\begin{gather*}
+4 \leq N, M \leq 1000 \\
+1 \leq P \leq 200 \\
+1 \leq T \leq 100
+\end{gather*}
+Se qualquer uma destas condições for violada, o script se recusará a gerar o caso de teste.
+
+\subsection{Entrada do programa}
+A entrada tem o formato especificado na descrição do trabalho e é lida do dispositivo de entrada padrão.
+
+Existem casos de teste inclusos junto ao código-fonte. Com o terminal/cmd aber\-to na pasta \texttt{bin}, podemos utilizar estes casos de teste fazendo
+\begin{verbatim}
+$ java Main < ../tc/sample2.txt
+\end{verbatim}
+Consulte o diretório \texttt{TaxiDriver/tc} para consultar/gerar outros casos de teste. Segue um exemplo de caso de teste válido:
+\begin{verbatim}
+4 5
+3
+1 2 4 1
+2 3 2 2
+3 0 0 0
+3
+0 3
+3 1
+4 0
+\end{verbatim}
+
+\subsection{Saída do programa}
+Durante a execução, o programa imprime na tela mensagens que informam sobre o estado dos taxistas e passageiros. Quando todas as threads terminam, uma linha em branco é impressa e seguem T linhas, onde a i-ésima linha indica a posição final do i-ésimo táxi fornecido na entrada. Depois temos uma linha em branco. Seguem, por fim, exatamente quatro linhas que imprimem detalhes do tempo de execução. Mostramos a seguir uma possível saída para o caso de teste \texttt{tc/sample2.txt} mostrado na sessão anterior:
+\begin{verbatim}
+Táxi #3 está disponível. Total de 1 táxi disponível.
+Táxi #2 está disponível. Total de 2 táxis disponíveis.
+Táxi #1 está disponível. Total de 3 táxis disponíveis.
+Cliente #1 pediu um táxi. Total de 1 cliente aguardando atendimento
+O cliente #1 será atendido pelo táxi #1
+2 táxis disponíveis e 0 clientes aguardando atendimento
+Cliente #3 pediu um táxi. Total de 1 cliente aguardando atendimento
+O cliente #3 será atendido pelo táxi #3
+1 táxi disponível e 0 clientes aguardando atendimento
+Cliente #2 pediu um táxi. Total de 1 cliente aguardando atendimento
+O cliente #2 será atendido pelo táxi #2
+0 táxis disponíveis e 0 clientes aguardando atendimento
+Táxi #3 alcançou o cliente #3
+Táxi #1 alcançou o cliente #1
+Táxi #2 alcançou o cliente #2
+Taxi #3 chegou ao destino (0, 0) do cliente #3
+Taxi #2 chegou ao destino (2, 2) do cliente #2
+Táxi #3 terminou o expediente na posição (0, 0)
+Táxi #2 terminou o expediente na posição (2, 2)
+Taxi #1 chegou ao destino (4, 1) do cliente #1
+Táxi #1 terminou o expediente na posição (4, 1)
+
+4 1
+2 2
+0 0
+
+Tempo de execução da leitura de dados da entrada: 0 ms
+Tempo de execução do processamento concorrente: 16 ms
+Tempo de execução da impressão da saída: 0 ms
+Tempo de execução total: 16 ms
+\end{verbatim}
+
+Note que a mensagem \texttt{Total de 1 cliente aguardando atendimento} conta apenas clientes que já contactaram a Central. Da mesma forma, \texttt{0 clientes aguardando atendimento} considera clientes que estão em contato com a Central mas que ainda não foram associados a nenhum táxi. Em outras palavras, um cliente ser atendido pela Central é diferente do cliente ter chegado a seu destino (este evento é notificado em mensagens do tipo \texttt{Taxi \#3 chegou ao destino (0, 0) do cliente \#3}).
+
+\section{Relatório de execução}
+
+\subsection{Descrição dos testes realizados e resultados obtidos}
+A aplicação foi testada numa máquina com 4 processadores. Testamos basicamente três tipos de caso de teste que julgamos suficientes pa\-ra avaliar a corretude do programa. Utilizamos sempre o pior caso em que o mapa tem dimensões $ 1000x1000 $, o maior tamanho possível. Para cada caso foram feitas 10 execuções e os tempos são todos dados em \textbf{milissegundos}. Descrevemos abaixo cada um desses casos:
+\begin{enumerate}
+\item \textbf{Um passageiro e vários taxistas} \\
+Utilizamos o arquivo \texttt{tc/1000\_1000\_1\_100.txt} para avaliar este caso. Encontramos as seguintes médias de tempo de execução:
+
+\begin{tabular}{|ll|}
+\hline
+Tempo médio de entrada & 16.7 \\ \hline
+Tempo médio do processamento concorrente & 466.2 \\ \hline
+Tempo médio da impressão da saída & 3.6 \\ \hline
+Tempo total médio & 486.5 \\ \hline
+\end{tabular}
+
+Este foi o caso mais rápido, como esperávamos. Como o número de clientes que chegaram ao seu destino é condição de parada da aplicação, é natural que um caso de teste que só contém um passageiro termine rapidamente.
+
+\item \textbf{Vários passageiros e um taxista} \\
+Utilizamos o arquivo \texttt{tc/1000\_1000\_30\_1.txt} para avaliar este caso. Encontramos as seguintes médias de tempo de execução:
+
+\begin{tabular}{|lr|}
+\hline
+Tempo médio de entrada & 10.4 \\ \hline
+Tempo médio do processamento concorrente & 41204.5 \\ \hline
+Tempo médio da impressão da saída & 0.1 \\ \hline
+Tempo total médio & 41215 \\ \hline
+\end{tabular}
+
+Este foi o caso mais demorado. Tão demorado que consideramos não usar o número máximo de passageiros, diminuir o número de execuções ou diminuir o tamanho do mapa. Decidimos manter o número de execuções e tamanho do mapa e diminuir o número de passageiros para 30. Este resultado era esperado já que este caso sequencializa o atendimento dos taxistas aos clientes. Como só existe um táxi, ele tem que atender um cliente por vez.
+
+\item \textbf{Vários passageiros e vários taxistas} \\
+Utilizamos o arquivo \texttt{tc/1000\_1000\_200\_100.txt} para avaliar este caso. Encontramos as seguintes médias de tempo de execução:
+
+\begin{tabular}{|lr|}
+\hline
+Tempo médio de entrada & 46.5 \\ \hline
+Tempo médio do processamento concorrente & 3817.7 \\ \hline
+Tempo médio da impressão da saída & 3.2 \\ \hline
+Tempo total médio & 3867.4 \\ \hline
+\end{tabular}
+
+\end{enumerate}
+
+Utilizamos o número máximo de clientes e taxistas possíveis na entrada, considerando que a razão 1/2 entre o número de taxistas e o número de passageiros seria suficiente para um processamento mais real da aplicação. Este caso foi mais rápido que o anterior, pois os táxis atendem vários clientes ao mesmo tempo, mas foi mais lento que o primeiro, que era o caso trivial em que só era necessário atender um cliente.
+
+O \textbf{tempo médio de entrada} é o tempo necessário para ler os arquivos de entrada e criar as threads clientes e taxistas.
+
+O \textbf{tempo médio de processamento concorrente} inclui o lançamento de todas as threads e o tempo da simulação do sistema táxi-passageiro (incluindo impressão do log de execução).
+
+O \textbf{tempo médio de impressão da saída} inclui apenas a impressão da saída no formato especificado na descrição do trabalho.
+
+O \textbf{tempo total médio} é a soma dos outros três tempos médios.
+
+\subsection{Dificuldades encontradas e estratégias adotadas}
+A lógica de sincronização entre threads taxistas e clientes foi a principal dificuldade encontrada. Em particular, foi difícil pensar em como fazer a central informar a um taxista que ele havia sido escolhido. Apesar de ser intuitivo que um táxi possui um cliente, tentamos primeiro algumas estratégias que falharam ou pareciam ineficientes, como utilizar um \texttt{HashMap} e vetores que mantinham o estado de cada cliente e taxista. No fim, nos aproveitamos da orientação a objetos fornecida pela linguagem para passar o objeto \texttt{Cliente} diretamente ao objeto \texttt{Taxi} por meio da instância de \texttt{Central}, implementando a ideia intuitiva de que um táxi possui um cliente.
+
+\end{document}
